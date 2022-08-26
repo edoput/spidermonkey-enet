@@ -13,11 +13,8 @@
 
 
 #define JSNATIVE(name) bool name(JSContext *ctx, unsigned argc, JS::Value *vp)
+#include "builtin.cpp"
 #include "base.cpp"
-
-JSNATIVE(noop) {
-  return true;
-}
 
 using string = std::string;
 
@@ -53,101 +50,9 @@ JSNATIVE(removeEventListener) {
 }
 #endif
 
-JSNATIVE(consoleLog) {
-  JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-  JS::RootedString rval_str(ctx, JS::ToString(ctx, args.get(0)));
-  std::cout << JS_EncodeStringToASCII(ctx, rval_str).get() << '\n';
-  return true;
-}
-
-namespace global {
-static JSClass globalClass = {
-  "global",
-  JSCLASS_GLOBAL_FLAGS,
-  &JS::DefaultGlobalClassOps,
-};
-
-};
-
-namespace net {
-
-class NetServer {
-  ENetHost* _host;
-  JS::Heap<JSFunction*> onConnect;
-  JS::Heap<JSFunction*> onDisconnect;
-  JS::Heap<JSFunction*> onMessage;
-  
-  void trace(JSTracer* tracer, void *data) {
-    JS::TraceEdge(tracer, &onConnect, "onConnect");
-    JS::TraceEdge(tracer, &onDisconnect, "onDisconnect");
-    JS::TraceEdge(tracer, &onMessage, "onMessage");
-  } 
-};
-
-#if 0
-JSNATIVE(dispatch) {
-  JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-  auto dispatchEventName = args.get(0);
-  JS::RootedValue rval(ctx);
-  JS::RootedValueArray<2> handlerArgs(ctx);
-  handlerArgs[0].set(args.get(1));
-  handlerArgs[1].set(args.get(2));
-  for (auto p : listeners) {
-    //TODO(edoput) compare eventName with dispatchEventName
-    //TODO(edoput) Heap<T>.address() gives back a pointer, we need to convert to handle
-    JS::RootedFunction fval(ctx, p.second);
-    JS_CallFunction(ctx, nullptr, fval, handlerArgs, &rval);
-  }
-  return true;
-}
-#endif
-
-static JSClass serverClass = {
-  "netserver",
-  0
-};
-static JSPropertySpec serverProperties[] = {};
-static JSFunctionSpec serverMethods[] = {
-    JS_FN("dispatch", noop, 2, 0),
-    JS_FS_END,
-};
-  void withNetServer(JSContext *ctx, JS::HandleObject global, JS::MutableHandleObject out) {
-    JS::RootedObject result(ctx, JS_DefineObject(ctx, global, "netserver", &serverClass, 0));
-    //TODO(edoput) get netserver object
-    //TODO(edoput) define netserver properties
-    JS_DefineFunctions(ctx, result, serverMethods);
-    //TODO(edoput) define private data
-    //TODO(edoput) allocate NetServer class
-    //TODO(edoput) set instance as private data
-    //TODO(edoput) hook up class to spidermonkey tracing GC
-    //TODO(edoput) 
-    // trace also the stuff we add to _listeners_
-    // JS_AddExtraGCRootsTracer(ctx, &trace_listeners, nullptr);
-    out.set(result);
-  }
-};
-
-
-namespace console {
-static JSClass consoleClass = {
-  "console",
-  0
-};
-
-static JSFunctionSpec consoleMethods[] = {
-  JS_FN("log", consoleLog, 1, 0),
-  JS_FS_END,
-};
-  void withConsole(JSContext *ctx, JS::HandleObject global, JS::MutableHandleObject out) {
-    JS::RootedObject result(ctx, JS_DefineObject(ctx, global, "console", &consoleClass, 0));
-    JS_DefineFunctions(ctx, result, consoleMethods);
-    out.set(result);
-  }
-};
-
 int main(int argc, const char* argv[]) {
   
-  string part = string(argv[0]);
+  string role = string(argv[0]);
   
   Setup();
 
@@ -162,13 +67,14 @@ int main(int argc, const char* argv[]) {
   //JS::InitRealmStandardClasses(ctx);
   JS::RootedObject netserver(ctx);
   JS::RootedObject console(ctx);
-  
-  net::withNetServer(ctx, global, &netserver);
-  console::withConsole(ctx, global, &console);
+
+  builtin::net::withNetServer(ctx, global, &netserver);
+  builtin::console::withConsole(ctx, global, &console);
 
 
   /* evaluate the script */  
   JS::RootedValue    rval(ctx);
+  // the script must set the netserver.handler to a function
   if (!LoadScript(ctx, "network.js", &rval)) {
 
     if (JS_IsExceptionPending(ctx)) {
@@ -185,14 +91,14 @@ int main(int argc, const char* argv[]) {
   PrintResult(ctx, rval, "(network.js): ");
   //TODO(edoput)
   //JS::RootedFunction dispatchEvent(ctx, JS_NewFunction(ctx, dispatch, 2, 0, "dispatchEvent"));
-  if (part == "./client") {
+  if (role == "./client") {
     ENetHost *client = MakeClient();
-    Client(client, ctx, global, dispatchEvent);
+    Client(client, ctx, global, netserver, console);
   } else {
     ENetHost  *server = MakeHost();
     // set up an internal job queue for Promises
     // before the self-hosting
-    Server(server, ctx, global, dispatchEvent);
+    Server(server, ctx, global, netserver, console);
   }
 
   JS_DestroyContext(ctx);

@@ -1,5 +1,5 @@
+#include <assert.h>
 #include <jsapi.h>
-#include <enet/enet.h>
 
 #include <js/Initialization.h>
 
@@ -40,47 +40,19 @@ ENetPeer *Connect(ENetHost *client) {
 }
 
 
-/* Available in the callbacks for netserver. Holds
- * a pointer to the curren ENetHost.
- */
-static JSClass hostClass = {
-  "host",
-  JSCLASS_HAS_PRIVATE,
-};
 
-JSNATIVE(disconnectPeer) {
-  JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-  //JS::HandleObject peerArg = args.get(0);
-  //ENetHost *currentHost = JS_GetPrivate(hostArg);
-  return true;
-}
-
-static JSFunctionSpec hostMethods[] = {
-  JS_FS_END,
-};
-
-/* Available in the callbacks for netserver. Holds
- * a pointer to the current ENetPeer.
- */
-static JSClass peerClass = {
-  "peer",
-  JSCLASS_HAS_PRIVATE,
-};
-
-static JSFunctionSpec peerMethods[] = {
-  JS_FS_END,
-};
-
-void Server(ENetHost *host, JSContext *ctx, JS::HandleObject global, JS::HandleFunction dispatch) {
+void Server(ENetHost *host, JSContext *ctx, JS::HandleObject global, JS::HandleObject netserver, JS::HandleObject console) {
   ENetEvent event;
   std::vector<ENetPeer*> peers;
 
   while (true) {
     JS::RootedValueArray<3> args(ctx);
-    JS::RootedObject eventHost(ctx, JS_NewObject(ctx, &hostClass)),
-                     eventPeer(ctx, JS_NewObject(ctx, &peerClass));
-    JS_DefineFunctions(ctx, eventHost, hostMethods);
-    JS_DefineFunctions(ctx, eventPeer, peerMethods);
+    JS::RootedObject eventHost(ctx, JS_NewObject(ctx, &enet::hostClass)),
+                     eventPeer(ctx, JS_NewObject(ctx, &enet::peerClass));
+    JS_DefineProperties(ctx, eventHost, enet::hostProperties);
+    JS_DefineProperties(ctx, eventPeer, enet::peerProperties);
+    JS_DefineFunctions(ctx, eventHost, enet::hostMethods);
+    JS_DefineFunctions(ctx, eventPeer, enet::peerMethods);
     
     JS::RootedValue rval(ctx);
     string eventName;
@@ -105,7 +77,12 @@ void Server(ENetHost *host, JSContext *ctx, JS::HandleObject global, JS::HandleF
       args[0].setString(JS_NewStringCopyZ(ctx, eventName.c_str()));
       args[1].setObject(*eventHost);
       args[2].setObject(*eventPeer);
-      JS_CallFunction(ctx, global, dispatch, args, &rval);
+
+      // the enet server has done one iteration of the loop
+      // it is time for us to call a function; it can either be a JSNATIVE
+      // or a callback implemented by the user
+      JS_CallFunctionName(ctx, netserver, "todo", args, &rval);
+      //JS_CallFunction(ctx, global, dispatch, args, &rval);
     }
 
     ENetPacket * packet = enet_packet_create ("packet", strlen ("packet") + 1, ENET_PACKET_FLAG_RELIABLE);
@@ -113,12 +90,12 @@ void Server(ENetHost *host, JSContext *ctx, JS::HandleObject global, JS::HandleF
   }
 }
 
-void Client(ENetHost *client, JSContext *ctx, JS::HandleObject global, JS::HandleFunction dispatch) {
+void Client(ENetHost *client, JSContext *ctx, JS::HandleObject global, JS::HandleObject netserver, JS::HandleObject console) {
   ENetPeer* peer = Connect(client); // connection to remote
-  JS::RootedObject clientHost(ctx, JS_NewObject(ctx, &hostClass)),
-                   eventPeer(ctx, JS_NewObject(ctx, &peerClass));
-  JS_DefineFunctions(ctx, clientHost, hostMethods);
-  JS_DefineFunctions(ctx, eventPeer, peerMethods);
+  JS::RootedObject clientHost(ctx, JS_NewObject(ctx, &enet::hostClass)),
+                   eventPeer(ctx, JS_NewObject(ctx, &enet::peerClass));
+  JS_DefineFunctions(ctx, clientHost, enet::hostMethods);
+  JS_DefineFunctions(ctx, eventPeer, enet::peerMethods);
 
   ENetEvent event;
 
@@ -143,7 +120,9 @@ void Client(ENetHost *client, JSContext *ctx, JS::HandleObject global, JS::Handl
       args[0].setString(JS_NewStringCopyZ(ctx, eventName.c_str()));
       args[1].setObject(*clientHost);
       args[2].setObject(*eventPeer);
-      JS_CallFunction(ctx, global, dispatch, args, &rval);
+      
+      //JS::Call(ctx, netserver, nullptr, args, &rval);
+      // JS_CallFunction(ctx, global, dispatch, args, &rval);
     }
   }
 }

@@ -230,23 +230,45 @@ namespace enet {
   JSNATIVE(getPeerAddress) {
     JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
     ENetPeer *self = getPeerPrivate(ctx, args);
-    ENetAddress address = self->address;
-    args.rval().setNumber(address.host);
+    char address[15];
+    assert(!enet_address_get_host_ip(&self->address, address, 15));
+    args.rval().setString(JS_NewStringCopyN(ctx, address, 16));
     return true;
   }
   JSNATIVE(getPeerBandwidth) {
+    JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+    ENetPeer *self = getPeerPrivate(ctx, args);
+    JS::RootedObject b(ctx, JS_NewPlainObject(ctx));
+    JS_DefineProperty(ctx, b, "incoming", self->incomingBandwidth, JSPROP_ENUMERATE || JSPROP_READONLY || JSPROP_PERMANENT);
+    JS_DefineProperty(ctx, b, "outgoing", self->outgoingBandwidth, JSPROP_ENUMERATE || JSPROP_READONLY || JSPROP_PERMANENT);
+    args.rval().setObjectOrNull(b);
     return true;
   }
+  
   JSNATIVE(getPeer) {
+    JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+    ENetPeer *self = getPeerPrivate(ctx, args);
+    
     return true;
   }
+
   JSNATIVE(getPeerState) {
+    JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+    ENetPeer *self = getPeerPrivate(ctx, args);
+    //TODO(edoput) mmm delicious magic values
+    args.rval().setInt32(self->state);
     return true;
   }
+  
   JSNATIVE(getPeerSession) {
+    JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+    ENetPeer *self = getPeerPrivate(ctx, args);
     return true;
   }
   JSNATIVE(getPeerStats) {
+    JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+    ENetPeer *self = getPeerPrivate(ctx, args);
+    
     return true;
   }
   static JSPropertySpec peerProperties[] = {
@@ -268,4 +290,3 @@ namespace enet {
   };
 
 };
-

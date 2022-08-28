@@ -161,7 +161,7 @@ namespace enet {
 
   /** ENetHost */
 
-  //[Exposed=netserver.handler]
+  //[Exposed=(network.server, network.client)]
   static JSClass hostClass = {
     "host",
     JSCLASS_HAS_PRIVATE,
@@ -212,7 +212,7 @@ namespace enet {
 
   /** ENetPeer */
   
-  // [Exposed=netserver.handler]
+  // [Exposed=(network.server, network.client)]
   static JSClass peerClass = {
     "peer",
     JSCLASS_HAS_PRIVATE,
@@ -222,7 +222,8 @@ namespace enet {
     JS::HandleValue  THIS = args.thisv();
     assert(THIS.isObject());
     JS::RootedObject h(ctx, &THIS.toObject());
-    ENetPeer *result = (ENetPeer *) JS_GetInstancePrivate(ctx, h, &hostClass, NULL);
+    //TODO(edoput) JS_GetInstancePrivate does not work?
+    ENetPeer *result = (ENetPeer *) JS_GetPrivate(h);
     return(result);
   }
 

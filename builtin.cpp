@@ -24,10 +24,7 @@ namespace builtin {
    *  Builtin names may be any JS value but I usually go for an object with a custom class.
    */
 
-  // the netserver global object exposes a handler function
-  // that receives all the ENet events from the loop.
-  namespace net {
-
+  
     // class NetServer {
     //   ENetHost* _host;
     //   JS::Heap<JSFunction*> handler;
@@ -43,23 +40,9 @@ namespace builtin {
     //   } 
     // };
 
-#if 0
-    JSNATIVE(dispatch) {
-      JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-      auto dispatchEventName = args.get(0);
-      JS::RootedValue rval(ctx);
-      JS::RootedValueArray<2> handlerArgs(ctx);
-      handlerArgs[0].set(args.get(1));
-      handlerArgs[1].set(args.get(2));
-      for (auto p : listeners) {
-	//TODO(edoput) compare eventName with dispatchEventName
-	//TODO(edoput) Heap<T>.address() gives back a pointer, we need to convert to handle
-	JS::RootedFunction fval(ctx, p.second);
-	JS_CallFunction(ctx, nullptr, fval, handlerArgs, &rval);
-      }
-      return true;
-    }
-#endif
+  // the netserver global object exposes a handler function
+  // that receives all the ENet events from the loop.
+  namespace net {
 
     static JSClass serverClass = {
       "Netserver",

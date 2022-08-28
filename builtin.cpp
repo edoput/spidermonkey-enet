@@ -44,21 +44,59 @@ namespace builtin {
   // that receives all the ENet events from the loop.
   namespace net {
 
+    //TODO(edoput) this must now be garbage collected
+    // trace also the stuff we add to _listeners_
+    // JS_AddExtraGCRootsTracer(ctx, &trace_listeners, nullptr);
+
+    JS::Heap<JSObject*> clientHandler, serverHandler;
+
+    void traceHandler(JSTracer* tracer, void* data) {
+      JS::TraceEdge(tracer, &serverHandler, "net::handler::server");
+      JS::TraceEdge(tracer, &clientHandler, "net::handler::client");
+    };
+
     static JSClass serverClass = {
       "Netserver",
       0
     };
 
+    void getServerHandlerFunction(JSContext *ctx, JS::MutableHandleValue rval) {
+      rval.setObjectOrNull(serverHandler.get());
+    }
+    
+    void getClientHandlerFunction(JSContext *ctx, JS::MutableHandleValue rval) {
+      rval.setObjectOrNull(clientHandler.get());
+    }
+
     JSNATIVE(getNetServerHandler) {
+      JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+      args.rval().setObjectOrNull(*serverHandler.address());
       return true;
     }
 
     JSNATIVE(setNetServerHandler) {
+      JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+      serverHandler.set(&args.get(0).toObject());
+      args.rval().setUndefined();
+      return true;
+    }
+    
+    JSNATIVE(getNetClientHandler) {
+      JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+      args.rval().setObjectOrNull(*clientHandler.address());
+      return true;
+    }
+
+    JSNATIVE(setNetClientHandler) {
+      JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+      clientHandler.set(&args.get(0).toObject());
+      args.rval().setUndefined();
       return true;
     }
   
     static JSPropertySpec serverProperties[] = {
-      JS_PSGS("handler", getNetServerHandler, setNetServerHandler, 0),
+      JS_PSGS("server", getNetServerHandler, setNetServerHandler, 0),
+      JS_PSGS("client", getNetClientHandler, setNetClientHandler, 0),
       JS_PS_END,
     };
   
@@ -69,17 +107,11 @@ namespace builtin {
 
     // exposes globally the name _netserver_ for an object of class netserver
     void withNetServer(JSContext *ctx, JS::HandleObject global, JS::MutableHandleObject out) {
-      JS::RootedObject result(ctx, JS_DefineObject(ctx, global, "netserver", &serverClass, 0));
+      JS::RootedObject result(ctx, JS_DefineObject(ctx, global, "network", &serverClass, 0));
       JS_DefineProperties(ctx, result, serverProperties);
       JS_DefineFunctions(ctx, result, serverMethods);
-      //TODO(edoput) define private data
-      //TODO(edoput) allocate NetServer class
-      //TODO(edoput) set instance as private data
-      //TODO(edoput) hook up class to spidermonkey tracing GC
-      //TODO(edoput) 
-      // trace also the stuff we add to _listeners_
-      // JS_AddExtraGCRootsTracer(ctx, &trace_listeners, nullptr);
       out.set(result);
+      JS_AddExtraGCRootsTracer(ctx, traceHandler, nullptr);
     }
   };
 

@@ -120,8 +120,13 @@ namespace builtin {
 
     JSNATIVE(consoleLog) {
       JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-      JS::RootedString rval_str(ctx, JS::ToString(ctx, args.get(0)));
-      std::cout << JS_EncodeStringToASCII(ctx, rval_str).get() << '\n';
+      //TODO(edoput) argc == args.length() ???
+      for (unsigned i = 0; i < argc; i++) {
+	std::cout << JS_EncodeStringToASCII(ctx, JS::ToString(ctx, args.get(i))).get();
+      }
+      std::cout << '\n';
+      // JS::RootedString rval_str(ctx, JS::ToString(ctx, args.get(0)));
+      // std::cout << JS_EncodeStringToASCII(ctx, rval_str).get() << '\n';
       return true;
     }
   

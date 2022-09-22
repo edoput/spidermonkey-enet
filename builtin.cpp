@@ -289,8 +289,5 @@ namespace enet {
     JS_FS_END,
   };
 
-  static JSFunctionSpec serverMethods[] = {
-    JS_FS_END,
-  };
 
 };

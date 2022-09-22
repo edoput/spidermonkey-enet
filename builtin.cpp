@@ -150,6 +150,9 @@ namespace enet {
     return(result);
   }
 
+  static JSPropertySpec hostProperties[] = {
+    JS_PS_END,
+  };
 
   JSNATIVE(disconnectPeer) {
     JS::CallArgs args = JS::CallArgsFromVp(argc, vp);

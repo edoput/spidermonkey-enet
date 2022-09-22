@@ -87,7 +87,7 @@ int main(int argc, const char* argv[]) {
   JS::RootedObject netserver(ctx);
   JS::RootedObject console(ctx);
 
-  builtin::net::withNetServer(ctx, global, &netserver);
+  builtin::network::withNetServer(ctx, global, &netserver);
   builtin::console::withConsole(ctx, global, &console);
 
 

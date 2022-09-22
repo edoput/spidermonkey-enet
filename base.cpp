@@ -43,60 +43,38 @@ ENetPeer *Connect(ENetHost *client) {
 
 void Server(ENetHost *host, JSContext *ctx, JS::HandleObject global, JS::HandleObject netserver, JS::HandleObject console) {
   ENetEvent event;
-  std::vector<ENetPeer*> peers;
+
+  JS::RootedObject eventHost(ctx, JS_NewObject(ctx, &enet::hostClass)),
+                   eventObject(ctx, JS_NewObject(ctx, &enet::eventClass));
+
+  JS_DefineProperties(ctx, eventHost, enet::hostProperties);
+  JS_DefineProperties(ctx, eventObject, enet::eventProperties);
+  JS_DefineFunctions(ctx, eventHost, enet::hostMethods);
+  JS_DefineFunctions(ctx, eventObject, enet::eventMethods);
+
+  JS::RootedValue rval(ctx), handler(ctx);
 
   while (true) {
-    JS::RootedValueArray<3> args(ctx);
-    JS::RootedObject eventHost(ctx, JS_NewObject(ctx, &enet::hostClass)),
-                     eventPeer(ctx, JS_NewObject(ctx, &enet::peerClass));
-    JS_DefineProperties(ctx, eventHost, enet::hostProperties);
-    JS_DefineProperties(ctx, eventPeer, enet::peerProperties);
-    JS_DefineFunctions(ctx, eventHost, enet::hostMethods);
-    JS_DefineFunctions(ctx, eventPeer, enet::peerMethods);
-    
-    JS::RootedValue rval(ctx), handler(ctx);
-    string eventName;
-    
-    builtin::net::getServerHandlerFunction(ctx, &handler);
+    builtin::network::getServerHandlerFunction(ctx, &handler);
+
+    JS::RootedValueArray<2> args(ctx);
 
     while (enet_host_service(host, &event, 1000) > 0) {
       JS_SetPrivate(eventHost, host);
-      JS_SetPrivate(eventPeer, event.peer);
+      JS_SetPrivate(eventObject, &event);
 
-      switch (event.type) {
-      case ENET_EVENT_TYPE_CONNECT:
-	eventName = "connect";
-	peers.push_back(event.peer);
-	break;
-      case ENET_EVENT_TYPE_RECEIVE:
-	eventName = "receive";
-	enet_packet_destroy(event.packet);
-	break;
-      case ENET_EVENT_TYPE_DISCONNECT:
-	eventName = "diconnect";
-	break;
-      }
-      args[0].setString(JS_NewStringCopyZ(ctx, eventName.c_str()));
-      args[1].setObject(*eventHost);
-      args[2].setObject(*eventPeer);
-
-      // the enet server has done one iteration of the loop
-      // it is time for us to call a function; it can either be a JSNATIVE
-      // or a callback implemented by the user
+      args[0].setObject(*eventHost);
+      args[1].setObject(*eventObject);
 
       if (!JS_CallFunctionValue(ctx, global, handler, args, &rval)) {
-	std::cout << "could not call handler\n";
-	std::cout << args.length() << '\n';
+        if (JS_IsExceptionPending(ctx)) {
+          JS::ExceptionStack exnStack(ctx);
+          JS::StealPendingExceptionStack(ctx, &exnStack);
+          JS::ErrorReportBuilder builder(ctx);
+          builder.init(ctx, exnStack, JS::ErrorReportBuilder::NoSideEffects);
+          JS::PrintError(ctx, stderr, builder, false);
+        }
       }
-      if (JS_IsExceptionPending(ctx)) {
-	JS::RootedValue exc(ctx);
-	if (!JS_GetPendingException(ctx, &exc)) {
-	  std::cout << "could not get exception\n";
-	  return;
-	}
-	PrintResult(ctx, rval, "(error:server): ");
-      }
-
     }
 
     ENetPacket * packet = enet_packet_create ("packet", strlen ("packet") + 1, ENET_PACKET_FLAG_RELIABLE);
@@ -106,53 +84,46 @@ void Server(ENetHost *host, JSContext *ctx, JS::HandleObject global, JS::HandleO
 
 void Client(ENetHost *client, JSContext *ctx, JS::HandleObject global, JS::HandleObject netserver, JS::HandleObject console) {
   ENetEvent event;
+
   ENetPeer* peer = Connect(client); // connection to remote
   JS::RootedObject clientHost(ctx, JS_NewObject(ctx, &enet::hostClass)),
-                   eventPeer(ctx, JS_NewObject(ctx, &enet::peerClass));
-  JS_DefineFunctions(ctx, clientHost, enet::hostMethods);
-  JS_DefineFunctions(ctx, eventPeer, enet::peerMethods);
+                   eventObject(ctx, JS_NewObject(ctx, &enet::eventClass));
+
+  JS_DefineProperties(ctx, clientHost,  enet::hostProperties);
+  JS_DefineProperties(ctx, eventObject, enet::eventProperties);
+  JS_DefineFunctions(ctx,  clientHost,  enet::hostMethods);
+  JS_DefineFunctions(ctx,  eventObject, enet::eventMethods);
 
   JS::RootedValue rval(ctx), handler(ctx);
-  string eventName;
     
-  builtin::net::getClientHandlerFunction(ctx, &handler);
 
   while (true) {
-    JS::RootedValueArray<3> args(ctx);
+    builtin::network::getClientHandlerFunction(ctx, &handler);
 
+    JS::RootedValueArray<2> args(ctx);
+
+    //TODO(edoput) test == 0, timeout reached
+    //TODO(edoput) test <  0, enet error
     while (enet_host_service(client, &event, 1000) > 0) {
-      switch (event.type) {
-      case ENET_EVENT_TYPE_CONNECT:
-	eventName = "connected";
-        break;
-      case ENET_EVENT_TYPE_RECEIVE:
-	eventName = "receive";
-	break;
-      case ENET_EVENT_TYPE_DISCONNECT:
-	eventName = "disconnect";
-	break;
-      }
-      args[0].setString(JS_NewStringCopyZ(ctx, eventName.c_str()));
-      args[1].setObject(*clientHost);
-      args[2].setObject(*eventPeer);
+      JS_SetPrivate(clientHost, client);
+      JS_SetPrivate(eventObject, &event);
+
+      args[0].setObject(*clientHost);
+      args[1].setObject(*eventObject);
 
         // the enet server has done one iteration of the loop
       // it is time for us to call a function; it can either be a JSNATIVE
       // or a callback implemented by the user
 
       if (!JS_CallFunctionValue(ctx, global, handler, args, &rval)) {
-	std::cout << "could not call handler\n";
-	std::cout << args.length() << '\n';
+        if (JS_IsExceptionPending(ctx)) {
+          JS::ExceptionStack exnStack(ctx);
+          JS::StealPendingExceptionStack(ctx, &exnStack);
+          JS::ErrorReportBuilder builder(ctx);
+          builder.init(ctx, exnStack, JS::ErrorReportBuilder::NoSideEffects);
+          JS::PrintError(ctx, stderr, builder, false);
+        }
       }
-      if (JS_IsExceptionPending(ctx)) {
-	JS::RootedValue exc(ctx);
-	if (!JS_GetPendingException(ctx, &exc)) {
-	  std::cout << "could not get exception\n";
-	  return;
-	}
-	PrintResult(ctx, rval, "(error:client): ");
-      }
-
     }
   }
 }

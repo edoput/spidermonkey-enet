@@ -10,6 +10,7 @@
 #include <js/Conversions.h>
 #include <js/Initialization.h>
 #include <js/SourceText.h>
+#include <js/Warnings.h>
 
 
 #define JSNATIVE(name) bool name(JSContext *ctx, unsigned argc, JS::Value *vp)
@@ -50,6 +51,15 @@ JSNATIVE(removeEventListener) {
 }
 #endif
 
+// now you can use JS::WarnUTF8 and friends from C++ and it will
+// be logged to this file.
+FILE *log_destination;
+
+void reporter(JSContext* ctx, JSErrorReport *report) {
+  JS::PrintError(ctx, log_destination, report, true);
+  fflush(log_destination);
+}
+
 int main(int argc, const char* argv[]) {
   
   string role = string(argv[0]);
@@ -59,6 +69,15 @@ int main(int argc, const char* argv[]) {
   JSContext *ctx = JS_NewContext(JS::DefaultHeapMaxBytes);
 
   JS::InitSelfHostedCode(ctx);
+
+  if (role == "server") {
+    log_destination = fopen("spidermonkey-client.log", "w+");
+  } else {
+    log_destination = fopen("spidermonkey-server.log", "w+");
+  }
+  assert(!JS::SetWarningReporter(ctx, reporter));
+
+
   JS::RealmOptions options;
   JS::RootedObject global(ctx, JS_NewGlobalObject(ctx, &global::globalClass, nullptr, JS::FireOnNewGlobalHook, options));
 

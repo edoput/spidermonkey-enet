@@ -24,29 +24,8 @@ namespace builtin {
    *  Builtin names may be any JS value but I usually go for an object with a custom class.
    */
 
-  
-    // class NetServer {
-    //   ENetHost* _host;
-    //   JS::Heap<JSFunction*> handler;
-    //   // JS::Heap<JSFunction*> onConnect;
-    //   // JS::Heap<JSFunction*> onDisconnect;
-    //   // JS::Heap<JSFunction*> onMessage;
-  
-    //   void trace(JSTracer* tracer, void *data) {
-    //     JS::TraceEdge(tracer, &handler, "handler");
-    //     // JS::TraceEdge(tracer, &onConnect, "onConnect");
-    //     // JS::TraceEdge(tracer, &onDisconnect, "onDisconnect");
-    //     // JS::TraceEdge(tracer, &onMessage, "onMessage");
-    //   } 
-    // };
+  namespace network {
 
-  // the netserver global object exposes a handler function
-  // that receives all the ENet events from the loop.
-  namespace net {
-
-    //TODO(edoput) this must now be garbage collected
-    // trace also the stuff we add to _listeners_
-    // JS_AddExtraGCRootsTracer(ctx, &trace_listeners, nullptr);
 
     JS::Heap<JSObject*> clientHandler, serverHandler;
 
@@ -56,7 +35,7 @@ namespace builtin {
     };
 
     static JSClass serverClass = {
-      "Netserver",
+      "Network",
       0
     };
 
@@ -99,9 +78,8 @@ namespace builtin {
       JS_PSGS("client", getNetClientHandler, setNetClientHandler, 0),
       JS_PS_END,
     };
-  
+
     static JSFunctionSpec serverMethods[] = {
-      JS_FN("dispatch", noop, 2, 0),
       JS_FS_END,
     };
 
@@ -122,11 +100,9 @@ namespace builtin {
       JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
       //TODO(edoput) argc == args.length() ???
       for (unsigned i = 0; i < argc; i++) {
-	std::cout << JS_EncodeStringToASCII(ctx, JS::ToString(ctx, args.get(i))).get();
+	  std::cout << JS_EncodeStringToASCII(ctx, JS::ToString(ctx, args.get(i))).get();
       }
       std::cout << '\n';
-      // JS::RootedString rval_str(ctx, JS::ToString(ctx, args.get(0)));
-      // std::cout << JS_EncodeStringToASCII(ctx, rval_str).get() << '\n';
       return true;
     }
   

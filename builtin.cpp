@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <jsapi.h>
+#include <js/ArrayBuffer.h>
 #include <enet/enet.h>
 
 JSNATIVE(noop) {
@@ -154,37 +155,36 @@ namespace enet {
     JS_PS_END,
   };
 
-  JSNATIVE(disconnectPeer) {
+  JSNATIVE(sendPacket) {
     JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-    //JS::HandleObject peerArg = args.get(0);
-    //ENetHost *currentHost = JS_GetPrivate(hostArg);
+
+    JS::HandleValue jsdata = args.get(0);
+    size_t dataSize = JS_GetStringEncodingLength(ctx, jsdata.toString());
+    if (dataSize == -1) {
+      //TODO(edoput) throw exception
+      return false;
+    }
+
+    //TODO(edoput) who owns this buffer and for how long?
+    void* buffer = malloc(dataSize);
+    if (JS_EncodeStringToBuffer(ctx, jsdata.toString(), (char*) buffer, dataSize)) {
+      //TODO(edoput) throw exception
+      return false;
+    }
+    ENetPacket * packet = enet_packet_create(buffer, dataSize, ENET_PACKET_FLAG_RELIABLE);
+    if (!packet) {
+      //TODO(edoput) throw exception
+      return false;
+    }
+ 
+    ENetHost *self = getHostPrivate(ctx, args.thisv());
+    //TODO(edoput) channel what?
+    enet_host_broadcast(self, 0, packet);
     return true;
   }
 
-  // This function is defined on an object called eventHost
-  // in the Client/Server loops. On each iteration of the loop
-  // we set the private data of the eventHost to point to the
-  // current ENetHost* that we received from the setup phase.
-  // The `this` identifier in JS is bound to this eventHost
-  // object but we can also recover it using the call arguments.
-  // JSNATIVE(todo) {
-  //   JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-  //   JS::HandleValue  THIS = args.thisv();
-  //   assert(THIS.isObject());
-  //   JS::RootedObject h(ctx, &THIS.toObject());
-  //   ENetHost *host = (ENetHost *) JS_GetInstancePrivate(ctx, h, &hostClass, NULL);
-  //   assert(host);
-  
-  //   //ENetHost *host = (ENetHost *) JS_GetPrivate(THIS);
-  //   return true;
-  // }
-
-  static JSPropertySpec hostProperties[] = {
-    JS_PS_END,
-  };
-
   static JSFunctionSpec hostMethods[] = {
-    //JS_FN("todo", todo, 0, 0),
+    JS_FN("sendPacket", sendPacket, 1, 0),
     JS_FS_END,
   };
 

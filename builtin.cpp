@@ -290,4 +290,86 @@ namespace enet {
   };
 
 
+  /** ENetEvent */
+  static JSClass eventClass = {
+    "event",
+    JSCLASS_HAS_PRIVATE,
+  };
+
+  ENetEvent *getEventPrivate(JSContext *ctx, JS::HandleValue THIS) {
+    assert(THIS.isObject());
+    JS::RootedObject h(ctx, &THIS.toObject());
+    //TODO(edoput) JS_GetInstancePrivate does not work?
+    ENetEvent *result = (ENetEvent *) JS_GetPrivate(h);
+    return(result);
+  }
+
+  JSNATIVE(getEventChannel) {
+    JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+    ENetEvent *self = getEventPrivate(ctx, args.thisv());
+    //TODO(edoput) args.rval().setNumber(self->channelID);
+    args.rval().setUndefined();
+    return true;
+  }
+
+  JSNATIVE(getEventPeer) {
+    JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+    ENetEvent *self = getEventPrivate(ctx, args.thisv());
+    JS::RootedObject eventPeer(ctx, JS_NewObject(ctx, &peerClass));
+    JS_DefineProperties(ctx, eventPeer, peerProperties);
+    JS_DefineFunctions(ctx, eventPeer, peerMethods);
+    JS_SetPrivate(eventPeer, self->peer);
+    args.rval().setObjectOrNull(eventPeer);
+    return true;
+  }
+
+  static char* eventNames[] = {
+    "none",
+    "connect",
+    "disconnect",
+    "receive",
+  };
+
+  JSNATIVE(getEventType) {
+    JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+    ENetEvent *self = getEventPrivate(ctx, args.thisv());
+    args.rval().setString(JS_NewStringCopyZ(ctx, eventNames[(uint32_t)self->type]));
+    return true;
+  }
+
+  // getEventPacket exposes the data contained in the packet
+  JSNATIVE(getEventPacket) {
+    JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+    ENetEvent *self = getEventPrivate(ctx, args.thisv());
+    if (self->packet) {
+      // We received a packet and there may be data associated with it.
+      // Expose it  as an array buffer, we will figure it out later.
+      // The packet owns the data but we share it with the
+      // JS runtime. Someone has to free this data eventually.
+      //TODO(edoput) set correct length; self->packet->dataLength
+      //TODO(edoput) set ArrayBuffer storage to packet data; self->packet->data
+      //TODO(edoput) find a way to have spidermonkey call enet_packet_free
+      // when it's done with it; self->packet->freeCallBack
+      JS::RootedObject packet(ctx, JS::NewArrayBuffer(ctx, 0));
+      args.rval().setObjectOrNull(packet);
+    } else {
+      // there was no packet associated
+      args.rval().setUndefined();
+    }
+    return true;
+  }
+
+  static JSPropertySpec eventProperties[] = {
+    //TODO(edoput) "packet"
+    JS_PSG("channel", getEventChannel, 0),
+    JS_PSG("peer", getEventPeer, 0),
+    JS_PSG("type", getEventType, 0),
+    JS_PSG("packet", getEventPacket, 0),
+    JS_PS_END,
+  };
+
+  static JSFunctionSpec eventMethods[] = {
+    JS_FS_END,
+  };
+
 };

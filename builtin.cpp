@@ -143,8 +143,7 @@ namespace enet {
     JSCLASS_HAS_PRIVATE,
   };
 
-  ENetHost *getHostPrivate(JSContext *ctx, JS::CallArgs args) {
-    JS::HandleValue  THIS = args.thisv();
+  ENetHost *getHostPrivate(JSContext *ctx, JS::HandleValue THIS) {
     assert(THIS.isObject());
     JS::RootedObject h(ctx, &THIS.toObject());
     ENetHost *result = (ENetHost *) JS_GetInstancePrivate(ctx, h, &hostClass, NULL);
@@ -194,8 +193,7 @@ namespace enet {
     JSCLASS_HAS_PRIVATE,
   };
 
-  ENetPeer *getPeerPrivate(JSContext *ctx, JS::CallArgs args) {
-    JS::HandleValue  THIS = args.thisv();
+  ENetPeer *getPeerPrivate(JSContext *ctx, JS::HandleValue THIS) {
     assert(THIS.isObject());
     JS::RootedObject h(ctx, &THIS.toObject());
     //TODO(edoput) JS_GetInstancePrivate does not work?
@@ -203,17 +201,20 @@ namespace enet {
     return(result);
   }
 
+  /** JS Properties to native struct fields */
+
   JSNATIVE(getPeerAddress) {
     JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-    ENetPeer *self = getPeerPrivate(ctx, args);
+    ENetPeer *self = getPeerPrivate(ctx, args.thisv());
     char address[15];
     assert(!enet_address_get_host_ip(&self->address, address, 15));
     args.rval().setString(JS_NewStringCopyN(ctx, address, 16));
     return true;
   }
+  
   JSNATIVE(getPeerBandwidth) {
     JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-    ENetPeer *self = getPeerPrivate(ctx, args);
+    ENetPeer *self = getPeerPrivate(ctx, args.thisv());
     JS::RootedObject b(ctx, JS_NewPlainObject(ctx));
     JS_DefineProperty(ctx, b, "incoming", self->incomingBandwidth, JSPROP_ENUMERATE || JSPROP_READONLY || JSPROP_PERMANENT);
     JS_DefineProperty(ctx, b, "outgoing", self->outgoingBandwidth, JSPROP_ENUMERATE || JSPROP_READONLY || JSPROP_PERMANENT);
@@ -221,43 +222,67 @@ namespace enet {
     return true;
   }
   
-  JSNATIVE(getPeer) {
-    JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-    ENetPeer *self = getPeerPrivate(ctx, args);
-    
-    return true;
-  }
 
   JSNATIVE(getPeerState) {
     JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-    ENetPeer *self = getPeerPrivate(ctx, args);
+    ENetPeer *self = getPeerPrivate(ctx, args.thisv());
     //TODO(edoput) mmm delicious magic values
     args.rval().setInt32(self->state);
     return true;
   }
   
-  JSNATIVE(getPeerSession) {
+  JSNATIVE(getPeerID) {
     JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-    ENetPeer *self = getPeerPrivate(ctx, args);
+    ENetPeer *self = getPeerPrivate(ctx, args.thisv());
+    args.rval().setInt32(self->incomingPeerID);
     return true;
   }
+  
+  JSNATIVE(getPeerSessionID) {
+    JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+    ENetPeer *self = getPeerPrivate(ctx, args.thisv());
+    args.rval().setInt32(self->incomingSessionID);
+    return true;
+  }
+  
   JSNATIVE(getPeerStats) {
     JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-    ENetPeer *self = getPeerPrivate(ctx, args);
-    
+    ENetPeer *self = getPeerPrivate(ctx, args.thisv());
+    args.rval().setUndefined();
     return true;
   }
+
   static JSPropertySpec peerProperties[] = {
     JS_PSG("address", getPeerAddress, 0),
     JS_PSG("state", getPeerState, 0),
     JS_PSG("bandwidth", getPeerBandwidth, 0),
-    JS_PSG("peer", getPeer, 0),
-    JS_PSG("session", getPeerSession, 0),
+    JS_PSG("id", getPeerID, 0),
+    JS_PSG("session", getPeerSessionID, 0),
     JS_PSG("stats", getPeerStats, 0),
     JS_PS_END,
   };
 
+  /** JS methods to enet_peer_* functions */
+
+  JSNATIVE(disconnectPeer) {
+    JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+    ENetPeer *self = getPeerPrivate(ctx, args.thisv());
+    //TODO(edoput) accept optional values: data, now, force
+    enet_peer_disconnect(self, 0);
+    args.rval().setUndefined();
+    return true;
+  }
+
+  JSNATIVE(pingPeer) {
+    JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+    ENetPeer *self = getPeerPrivate(ctx, args.thisv());
+    enet_peer_ping(self);
+    return true;
+  }
+
   static JSFunctionSpec peerMethods[] = {
+    JS_FN("disconnect", disconnectPeer, 1, 0),
+    JS_FN("ping", pingPeer, 1, 0),
     JS_FS_END,
   };
 

@@ -95,21 +95,16 @@ int main(int argc, const char* argv[]) {
   JS::RootedValue    rval(ctx);
   // the script must set the netserver.handler to a function
   if (!LoadScript(ctx, "network.js", &rval)) {
-
     if (JS_IsExceptionPending(ctx)) {
-      JS::RootedValue exc(ctx);
-      if (!JS_GetPendingException(ctx, &exc)) {
-	std::cout << "could not get exception\n";
-	return -1;
-      }
-      PrintResult(ctx, rval, "(error:networks.js): ");
+      JS::ExceptionStack exnStack(ctx);
+      JS::StealPendingExceptionStack(ctx, &exnStack);
+      JS::ErrorReportBuilder builder(ctx);
+      builder.init(ctx, exnStack, JS::ErrorReportBuilder::NoSideEffects);
+      JS::PrintError(ctx, stderr, builder, false);
     }
-    std::cout << "no exception thrown by network.js\n";
     return -1;
   }
-  PrintResult(ctx, rval, "(network.js): ");
-  //TODO(edoput)
-  //JS::RootedFunction dispatchEvent(ctx, JS_NewFunction(ctx, dispatch, 2, 0, "dispatchEvent"));
+
   if (role == "./client") {
     ENetHost *client = MakeClient();
     Client(client, ctx, global, netserver, console);

@@ -25,24 +25,55 @@ var currentState = ServerState.Unconnected;
 //var host = network.serve({address: "127.0.0.1", port: 20595});
 
 function logPeer(peer) {
-    let message = `peer
-        state   ${enet_states[peer.state]}
-        ID      ${peer.id}
-        address ${peer.address}
-        session ${peer.session}`;
-    console.log(message);
+  let message = `peer
+      state   ${enet_states[peer.state]}
+      ID      ${peer.id}
+      address ${peer.address}
+      session ${peer.session}`;
+  console.log(message);
+}
+
+function logEvent(event) {
+  let message = `event
+      channel ${event.channel}
+      peer    ${event.peer}
+      type    ${event.type}`;
+  console.log(message);
+}
+
+function decodeString(ab) {
+  return String.fromCharCode.apply(null, new Uint16Array(ab));
+}
+
+function encodeString(str) {
+  var buf = new ArrayBuffer(str.length*2); // 2 bytes for each char
+  var bufView = new Uint16Array(buf);
+  for (var i=0, strLen=str.length; i < strLen; i++) {
+    bufView[i] = str.charCodeAt(i);
+  }
+  return buf;
 }
 
 network.server = (host, event) => {
   switch (event.type) {
   case "connect":
-    //host.sendPacket(`+${event.peer.id}`);
+    logPeer(event.peer);
+    host.sendPacket(`+${event.peer.id}`);
     break;
   case "disconnect":
-    //host.sendPacket(`-${event.peer.id}`);
+    logPeer(event.peer);
+    host.sendPacket(`-${event.peer.id}`);
     break;
+  case "receive":
+    //TODO(edoput) forward message to other peers
+    if (event.packet !== undefined) {
+      console.log(`received ${event.packet.byteLength} bytes from ${event.peer.id}`)
+      console.log(decodeString(event.packet));
+    }
+    break;
+  case "none":
+    console.log("received none :(")
   }
-  logPeer(event.peer);
 }
 
 network.client = (host, event) => {
@@ -51,12 +82,17 @@ network.client = (host, event) => {
     logPeer(event.peer);
     break;
   case "disconnect":
+    logPeer(event.peer);
     break;
   case "receive":
-    if (event.packet.data !== undefined) {
-      console.log(event.packet.data);
+    console.log("received data from server");
+    if (event.packet !== undefined) {
+      console.log(`received ${event.packet.byteLength} bytes from server`)
+      console.log(decodeString(event.packet));
     }
     break;
+  case "none":
+    console.log("received none :(")
   }
 }
 

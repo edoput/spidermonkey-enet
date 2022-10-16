@@ -66,56 +66,63 @@ int main(int argc, const char* argv[]) {
   
   Setup();
 
-  JSContext *ctx = JS_NewContext(JS::DefaultHeapMaxBytes);
+  JSContext *rootCtx = JS_NewContext(JS::DefaultHeapMaxBytes);
+  JSContext *enetCtx = JS_NewContext(JS::DefaultHeapMaxBytes, JS_GetRuntime(rootCtx));
 
-  JS::InitSelfHostedCode(ctx);
+
+  //TODO(edoput) enable promises
+  //js::UseInternalJobQueue(rootCtx); // Promises
+  JS::InitSelfHostedCode(rootCtx);
+  JS::InitSelfHostedCode(enetCtx);
 
   if (role == "server") {
     log_destination = fopen("spidermonkey-client.log", "w+");
   } else {
     log_destination = fopen("spidermonkey-server.log", "w+");
   }
-  assert(!JS::SetWarningReporter(ctx, reporter));
+  assert(!JS::SetWarningReporter(rootCtx, reporter));
 
-
+  // https://groups.google.com/g/mozilla.dev.tech.js-engine/c/wr55L3lCMZg/m/wExXgUqvAgAJ
+  // Yes you can create multiple global objects with JS_NewGlobalObject, switch
+  // between them with JSAutoRealm, and compile/execute code in each
+  // realm/global separately.  
   JS::RealmOptions options;
-  JS::RootedObject global(ctx, JS_NewGlobalObject(ctx, &global::globalClass, nullptr, JS::FireOnNewGlobalHook, options));
+  JS::RootedObject global(rootCtx, JS_NewGlobalObject(rootCtx, &global::globalClass, nullptr, JS::FireOnNewGlobalHook, options));
 
-  JSAutoRealm ar(ctx, global);
+  JSAutoRealm ar(rootCtx, global);
   //TODO(edoput) built-in JS global object properties are already initialized
-  //JS::InitRealmStandardClasses(ctx);
-  JS::RootedObject netserver(ctx);
-  JS::RootedObject console(ctx);
+  //JS::InitRealmStandardClasses(rootCtx);
+  JS::RootedObject network(rootCtx);
+  JS::RootedObject console(rootCtx);
 
-  builtin::network::withNetServer(ctx, global, &netserver);
-  builtin::console::withConsole(ctx, global, &console);
-
+  builtin::network::withNetwork(rootCtx, global, &network);
+  builtin::console::withConsole(rootCtx, global, &console);
 
   /* evaluate the script */  
-  JS::RootedValue    rval(ctx);
+  JS::RootedValue    rval(rootCtx);
   // the script must set the netserver.handler to a function
-  if (!LoadScript(ctx, "network.js", &rval)) {
-    if (JS_IsExceptionPending(ctx)) {
-      JS::ExceptionStack exnStack(ctx);
-      JS::StealPendingExceptionStack(ctx, &exnStack);
-      JS::ErrorReportBuilder builder(ctx);
-      builder.init(ctx, exnStack, JS::ErrorReportBuilder::NoSideEffects);
-      JS::PrintError(ctx, stderr, builder, false);
+  if (!LoadScript(rootCtx, "network.js", &rval)) {
+    if (JS_IsExceptionPending(rootCtx)) {
+      JS::ExceptionStack exnStack(rootCtx);
+      JS::StealPendingExceptionStack(rootCtx, &exnStack);
+      JS::ErrorReportBuilder builder(rootCtx);
+      builder.init(rootCtx, exnStack, JS::ErrorReportBuilder::NoSideEffects);
+      JS::PrintError(rootCtx, stderr, builder, false);
     }
     return -1;
   }
 
   if (role == "./client") {
     ENetHost *client = MakeClient();
-    Client(client, ctx, global, netserver, console);
+    Client(client, rootCtx, global, network, console);
   } else {
     ENetHost  *server = MakeHost();
     // set up an internal job queue for Promises
     // before the self-hosting
-    Server(server, ctx, global, netserver, console);
+    Server(server, rootCtx, global, network, console);
   }
 
-  JS_DestroyContext(ctx);
+  JS_DestroyContext(rootCtx);
 
   Teardown();
 }

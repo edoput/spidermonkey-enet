@@ -85,7 +85,7 @@ namespace builtin {
     };
 
     // exposes globally the name _netserver_ for an object of class netserver
-    void withNetServer(JSContext *ctx, JS::HandleObject global, JS::MutableHandleObject out) {
+    void withNetwork(JSContext *ctx, JS::HandleObject global, JS::MutableHandleObject out) {
       JS::RootedObject result(ctx, JS_DefineObject(ctx, global, "network", &serverClass, 0));
       JS_DefineProperties(ctx, result, serverProperties);
       JS_DefineFunctions(ctx, result, serverMethods);
@@ -337,6 +337,10 @@ namespace enet {
     return true;
   }
 
+  void enetPacketFree(void* packetData, void* enetPacket) {
+    enet_packet_destroy((ENetPacket*) enetPacket);
+  }
+
   // getEventPacket exposes the data contained in the packet
   JSNATIVE(getEventPacket) {
     JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
@@ -346,11 +350,8 @@ namespace enet {
       // Expose it  as an array buffer, we will figure it out later.
       // The packet owns the data but we share it with the
       // JS runtime. Someone has to free this data eventually.
-      //TODO(edoput) set correct length; self->packet->dataLength
-      //TODO(edoput) set ArrayBuffer storage to packet data; self->packet->data
-      //TODO(edoput) find a way to have spidermonkey call enet_packet_free
       // when it's done with it; self->packet->freeCallBack
-      JS::RootedObject packet(ctx, JS::NewArrayBuffer(ctx, 0));
+      JS::RootedObject packet(ctx, JS::NewExternalArrayBuffer(ctx, self->packet->dataLength, (void*) self->packet->data, &enetPacketFree, (void*) self));
       args.rval().setObjectOrNull(packet);
     } else {
       // there was no packet associated
@@ -360,7 +361,6 @@ namespace enet {
   }
 
   static JSPropertySpec eventProperties[] = {
-    //TODO(edoput) "packet"
     JS_PSG("channel", getEventChannel, 0),
     JS_PSG("peer", getEventPeer, 0),
     JS_PSG("type", getEventType, 0),

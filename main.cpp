@@ -1,55 +1,23 @@
+#include <cassert>
 #include <string>
-#include <fstream>
-#include <iostream>
-
+//#include <fstream>
+//#include <iostream>
+//
 #include <jsapi.h>
-#include <enet/enet.h>
-
+//#include <enet/enet.h>
+//
 #include <js/CompilationAndEvaluation.h>
 #include <js/CompileOptions.h>
-#include <js/Conversions.h>
+//#include <js/Conversions.h>
 #include <js/Initialization.h>
-#include <js/SourceText.h>
+//#include <js/SourceText.h>
 #include <js/Warnings.h>
 
-
-#define JSNATIVE(name) bool name(JSContext *ctx, unsigned argc, JS::Value *vp)
-#include "builtin.cpp"
 #include "base.cpp"
+#include "builtin/network.hpp"
+#include "builtin/console.hpp"
 
 using string = std::string;
-
-/* you cannot store just JSFunction because that;s just the code! What you
- * want instead is the function value and the closure which means keeping around
- * the full JSObject*.
- * Moreover when we call netserver.addEventListener(eventName, listener);
- * we have to take ownership of listener as a JSObject. This means adding a
- * callback to the Spidermonkey GC to trace the JSObject* we have and mark
- * them as active.
- */
-#if 0
-static std::vector<std::pair<JS::Heap<JSString*>, JS::Heap<JSFunction*>>> listeners = {};
-
-void trace_listeners(JSTracer* tracer, void *data) {
-  for (auto &element : listeners) {
-    JS::TraceEdge(tracer, &(element.first), "eventName");
-    JS::TraceEdge(tracer, &(element.second), "eventHandler");
-  }
-}
-
-
-JSNATIVE(addEventListener) {
-  JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-  auto eventName = JS::ToString(ctx, args.get(0));
-  auto listenerFunc = JS_ValueToFunction(ctx, args.get(1));
-  listeners.push_back(std::make_pair(JS::Heap(eventName), JS::Heap(listenerFunc)));
-  return true;
-}
-
-JSNATIVE(removeEventListener) {
-  return true;  
-}
-#endif
 
 // now you can use JS::WarnUTF8 and friends from C++ and it will
 // be logged to this file.
@@ -60,9 +28,21 @@ void reporter(JSContext* ctx, JSErrorReport *report) {
   fflush(log_destination);
 }
 
+/** The JS interpreter needs a global object. You can attach
+ other names to the global objects like the browser does with
+ _window_, _document_ and so on.
+*/
+namespace global {
+  static JSClass globalClass = {
+    "global",
+    JSCLASS_GLOBAL_FLAGS,
+    &JS::DefaultGlobalClassOps,
+  };
+};
+
 int main(int argc, const char* argv[]) {
   
-  string role = string(argv[0]);
+  string role{argv[0]};
   
   Setup();
 
@@ -91,7 +71,7 @@ int main(int argc, const char* argv[]) {
 
   JSAutoRealm ar(rootCtx, global);
   //TODO(edoput) built-in JS global object properties are already initialized
-  //JS::InitRealmStandardClasses(rootCtx);
+  JS::InitRealmStandardClasses(rootCtx);
   JS::RootedObject network(rootCtx);
   JS::RootedObject console(rootCtx);
 

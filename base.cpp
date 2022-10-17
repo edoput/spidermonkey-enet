@@ -1,7 +1,12 @@
 #include <assert.h>
-#include <jsapi.h>
+#include <iostream>
 
+#include <jsapi.h>
+#include <js/Conversions.h>
 #include <js/Initialization.h>
+
+#include "builtin/network.hpp"
+#include "binding/enet.hpp"
 
 using std::string;
 
@@ -77,8 +82,8 @@ void Server(ENetHost *host, JSContext *ctx, JS::HandleObject global, JS::HandleO
       }
     }
 
-    ENetPacket * packet = enet_packet_create ("packet", strlen ("packet") + 1, ENET_PACKET_FLAG_RELIABLE);
-    enet_host_broadcast(host, 0, packet);
+    //ENetPacket * packet = enet_packet_create ("packet", strlen ("packet") + 1, ENET_PACKET_FLAG_RELIABLE);
+    //enet_host_broadcast(host, 0, packet);
   }
 }
 
@@ -125,6 +130,12 @@ void Client(ENetHost *client, JSContext *ctx, JS::HandleObject global, JS::Handl
         }
       }
     }
+    //uint8_t message[6] = {'H', 'e', 'l', 'l', 'o', '!'};
+    uint16_t message[6] = {0x48, 0x65, 0x6C, 0x6C, 0x6F, 0x21};
+    ENetPacket * packet = enet_packet_create (&message, 12, ENET_PACKET_FLAG_RELIABLE);
+    // NOTE(edoput) both options work here
+    enet_peer_send(peer, 0, packet);
+    //enet_host_broadcast(client, 0, packet);
   }
 }
 

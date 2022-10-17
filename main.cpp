@@ -47,13 +47,13 @@ int main(int argc, const char* argv[]) {
   Setup();
 
   JSContext *rootCtx = JS_NewContext(JS::DefaultHeapMaxBytes);
-  JSContext *enetCtx = JS_NewContext(JS::DefaultHeapMaxBytes, JS_GetRuntime(rootCtx));
+  //JSContext *enetCtx = JS_NewContext(JS::DefaultHeapMaxBytes);
 
 
   //TODO(edoput) enable promises
   //js::UseInternalJobQueue(rootCtx); // Promises
   JS::InitSelfHostedCode(rootCtx);
-  JS::InitSelfHostedCode(enetCtx);
+  //JS::InitSelfHostedCode(enetCtx);
 
   if (role == "server") {
     log_destination = fopen("spidermonkey-client.log", "w+");

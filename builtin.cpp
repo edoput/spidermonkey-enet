@@ -147,7 +147,7 @@ namespace enet {
   ENetHost *getHostPrivate(JSContext *ctx, JS::HandleValue THIS) {
     assert(THIS.isObject());
     JS::RootedObject h(ctx, &THIS.toObject());
-    ENetHost *result = (ENetHost *) JS_GetInstancePrivate(ctx, h, &hostClass, NULL);
+    auto result = static_cast<ENetHost *>(JS_GetInstancePrivate(ctx, h, &hostClass, NULL));
     return(result);
   }
 
@@ -200,7 +200,7 @@ namespace enet {
     assert(THIS.isObject());
     JS::RootedObject h(ctx, &THIS.toObject());
     //TODO(edoput) JS_GetInstancePrivate does not work?
-    ENetPeer *result = (ENetPeer *) JS_GetPrivate(h);
+    auto result = static_cast<ENetPeer *>(JS_GetPrivate(h));
     return(result);
   }
 
@@ -300,7 +300,7 @@ namespace enet {
     assert(THIS.isObject());
     JS::RootedObject h(ctx, &THIS.toObject());
     //TODO(edoput) JS_GetInstancePrivate does not work?
-    ENetEvent *result = (ENetEvent *) JS_GetPrivate(h);
+    auto result = static_cast<ENetEvent *>(JS_GetPrivate(h));
     return(result);
   }
 

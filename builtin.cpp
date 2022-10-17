@@ -94,11 +94,12 @@ namespace builtin {
     }
   };
 
-
   namespace console {
+    static std::mutex m;
 
     JSNATIVE(consoleLog) {
       JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+      std::scoped_lock<std::mutex> lk{m};
       //TODO(edoput) argc == args.length() ???
       for (unsigned i = 0; i < argc; i++) {
 	  std::cout << JS_EncodeStringToASCII(ctx, JS::ToString(ctx, args.get(i))).get();

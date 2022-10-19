@@ -19,9 +19,15 @@ main: $(OBJECTS)
 clean:
 	rm $(OBJECTS)
 
-variables:
-	@echo $(SOURCES)
-	@echo $(OBJECTS)
+debug:
+	$(foreach source,$(SOURCES), $(info source $(source)))
+	$(foreach object,$(OBJECTS), $(info object $(object)))
+	@echo
+	@echo "compiler flags"
 	@echo $(CPPFLAGS)
+	@echo
+	@echo "linker flags"
 	@echo $(LDFLAGS)
+	@echo
+	@echo "linker libraries"
 	@echo $(LDLIBS)

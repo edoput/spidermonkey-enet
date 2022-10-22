@@ -1,27 +1,53 @@
+#include <jsapi.h>
+
 #include "builtin/macro.hpp"
 #include "builtin/timeout.hpp"
 
-#include "event_loop/event_loop.hpp"
+#include "event_loop/loop.hpp"
 
 namespace builtin {
         namespace timeout {
-                // TODO(edoput) inherit from Task
-                class TimeoutTask {
-                        std::chrono::time_point<std::chrono::steady_clock> deadline;
+                //TODO(edoput) tracing functionRef
+                class TimeoutTask : public event_loop::Task {
+                        JSContext            *ctx;
+                        JS::Heap<JSObject*>  functionRef;
+                        //TODO(edoput) args value array in Heap pointer
+                        std::chrono::time_point<std::chrono::steady_clock> target;
 
-                        public:
-                                TimeoutTask(JSObject *functionRef, int ms) {
-                                        auto now = std::chrono::steady_clock::now();
-                                        deadline = now + std::chrono::milliseconds(ms);
-                                }
+                public:
+                        TimeoutTask(JSContext *ctx, JSObject *functionRef) :
+                                ctx(ctx),
+                                functionRef(functionRef),
+                                target(std::chrono::steady_clock::now())
+                        {}
 
-                                bool runnable() {
-                                        return std::chrono::steady_clock::now() >= deadline;
-                                }
+                        TimeoutTask(JSContext *ctx, JSObject *functionRef, int delay) :
+                                ctx(ctx),
+                                functionRef(functionRef),
+                                target(std::chrono::steady_clock::now()
+                                       + std::chrono::milliseconds(delay))
+                        {}
 
-                                void run() {
-                                        return;
+                        bool ready() override {
+                                return std::chrono::steady_clock::now() >= target;
+                        }
+
+                        void run() override {
+                                auto args = JS::HandleValueArray::empty();
+                                JS::RootedObject global(ctx, JS::CurrentGlobalOrNull(ctx));
+                                JS::RootedValue callback(ctx, JS::ObjectOrNullValue(functionRef.get()));
+                                JS::RootedValue rval(ctx);
+
+                                JS_CallFunctionValue(ctx, global, callback, args, &rval);
+
+                                if (JS_IsExceptionPending(ctx)) {
+                                        JS::ExceptionStack exnStack(ctx);
+                                        JS::StealPendingExceptionStack(ctx, &exnStack);
+                                        JS::ErrorReportBuilder builder(ctx);
+                                        builder.init(ctx, exnStack, JS::ErrorReportBuilder::NoSideEffects);
+                                        JS::PrintError(ctx, stderr, builder, false);
                                 }
+                        }
                 };
 
                 JSNATIVE(setTimeout) {
@@ -29,13 +55,14 @@ namespace builtin {
                         // setTimeout(functionRef, delay, param1);
                         // setTimeout(functionRef, delay, param1, param2);
                         // setTimeout(functionRef, delay, param1, param2, ...);
+                        
                         JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-                        JS::HandleValue functionRef = args.get(0);
 
                         // TODO(edoput) get timeout duration
-                        new TimeoutTask(nullptr, 0);
-                        // TODO(edoput) queue to event loop
-                        // TODO(edoput) return value
+                        auto timeout = new TimeoutTask(ctx, &args.get(0).toObject(), 0);
+                        auto loop = static_cast<event_loop::Loop*>(JS_GetContextPrivate(ctx));
+                        loop->queue(timeout);
+                        // TODO(edoput) return id of timeout
                         return true;
                 };
 

@@ -14,8 +14,9 @@
 #include <js/Warnings.h>
 
 #include "base.cpp"
-#include "builtin/network.hpp"
 #include "builtin/console.hpp"
+#include "builtin/network.hpp"
+#include "builtin/timeout.hpp"
 
 using string = std::string;
 
@@ -74,9 +75,11 @@ int main(int argc, const char* argv[]) {
   JS::InitRealmStandardClasses(rootCtx);
   JS::RootedObject network(rootCtx);
   JS::RootedObject console(rootCtx);
+  JS::RootedObject timeout(rootCtx);
 
   builtin::network::withNetwork(rootCtx, global, &network);
   builtin::console::withConsole(rootCtx, global, &console);
+  builtin::timeout::withTimeout(rootCtx, global, &timeout);
 
   /* evaluate the script */  
   JS::RootedValue    rval(rootCtx);

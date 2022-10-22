@@ -18,6 +18,8 @@
 #include "builtin/network.hpp"
 #include "builtin/timeout.hpp"
 
+#include "event_loop/loop.hpp"
+
 using string = std::string;
 
 // now you can use JS::WarnUTF8 and friends from C++ and it will
@@ -39,6 +41,43 @@ namespace global {
     JSCLASS_GLOBAL_FLAGS,
     &JS::DefaultGlobalClassOps,
   };
+};
+
+event_loop::Loop loop;
+
+class ScriptTask : public event_loop::Task {
+
+        using Path = std::filesystem::path;
+
+        JSContext* ctx;
+        Path       scriptPath;
+
+        public:
+                ScriptTask(JSContext* ctx, Path scriptPath) :
+                        ctx(ctx),
+                        scriptPath(scriptPath)
+                {}
+
+                bool ready() override {
+                        return true;
+                };
+
+                void run() override {
+                        JS::OwningCompileOptions options(ctx);
+                        JS::RootedValue rval(ctx);;
+                        JS::EvaluateUtf8Path(ctx, options, scriptPath.c_str(), &rval);
+                        if (JS_IsExceptionPending(ctx)) {
+                          JS::ExceptionStack exnStack(ctx);
+                          JS::StealPendingExceptionStack(ctx, &exnStack);
+                          JS::ErrorReportBuilder builder(ctx);
+                          builder.init(ctx, exnStack, JS::ErrorReportBuilder::NoSideEffects);
+                          JS::PrintError(ctx, stderr, builder, false);
+                        }
+                };
+                // conversion to task
+                //operator event_loop::Task*() {
+                //        return dynamic_cast<event_loop::Task*>(this);
+                //}
 };
 
 int main(int argc, const char* argv[]) {
@@ -81,29 +120,32 @@ int main(int argc, const char* argv[]) {
   builtin::console::withConsole(rootCtx, global, &console);
   builtin::timeout::withTimeout(rootCtx, global, &timeout);
 
-  /* evaluate the script */  
-  JS::RootedValue    rval(rootCtx);
-  // the script must set the netserver.handler to a function
-  if (!LoadScript(rootCtx, "network.js", &rval)) {
-    if (JS_IsExceptionPending(rootCtx)) {
-      JS::ExceptionStack exnStack(rootCtx);
-      JS::StealPendingExceptionStack(rootCtx, &exnStack);
-      JS::ErrorReportBuilder builder(rootCtx);
-      builder.init(rootCtx, exnStack, JS::ErrorReportBuilder::NoSideEffects);
-      JS::PrintError(rootCtx, stderr, builder, false);
-    }
-    return -1;
+  // attach to this context the event loop
+  JS_SetContextPrivate(rootCtx, static_cast<void*>(&loop));
+
+  auto networkScript = new ScriptTask(rootCtx, "network.js");
+  loop.queue(networkScript);
+  while (true) {
+          // NOTE(edoput) I don't like this implementation right now
+          // the loop just spin always and there is no indication of sending
+          // the thread to sleep at least for a little
+
+          // MACRO task
+          if (auto task = loop.next()) {
+                  task.value()->run();
+          }
+          // TODO(edoput) MICRO task
   }
 
-  if (role == "./client") {
-    ENetHost *client = MakeClient();
-    Client(client, rootCtx, global, network, console);
-  } else {
-    ENetHost  *server = MakeHost();
-    // set up an internal job queue for Promises
-    // before the self-hosting
-    Server(server, rootCtx, global, network, console);
-  }
+  //if (role == "./client") {
+  //  ENetHost *client = MakeClient();
+  //  Client(client, rootCtx, global, network, console);
+  //} else {
+  //  ENetHost  *server = MakeHost();
+  //  // set up an internal job queue for Promises
+  //  // before the self-hosting
+  //  Server(server, rootCtx, global, network, console);
+  //}
 
   JS_DestroyContext(rootCtx);
 

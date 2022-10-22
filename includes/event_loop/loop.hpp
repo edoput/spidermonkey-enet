@@ -41,8 +41,8 @@ namespace event_loop {
 
                 public:
                         // a task is runnable if its document is either null or fully active
-                        virtual bool runnable();
-                        virtual void run();
+                        virtual bool ready() = 0;
+                        virtual void run() = 0;
         };
 
         /** Each event loop has a currently running task, which is either a task or null.
@@ -53,9 +53,10 @@ namespace event_loop {
 
         using TaskQueue = std::queue<Task*>;
 
-        class EventLoop {
-                void queue(Task &t);
-                std::optional<Task*> next();
+        class Loop {
+                public:
+                        void queue(Task* t);
+                        std::optional<Task*> next();
                 private:
                         TaskQueue m_queue;
         };

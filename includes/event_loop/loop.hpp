@@ -4,7 +4,7 @@
 #include <condition_variable>
 #include <functional>
 #include <optional>
-#include <queue>
+#include <list>
 
 #include <jsapi.h>
 
@@ -51,10 +51,12 @@ namespace event_loop {
 
         /* 8.1.7.2 Queuing tasks algorithm */
 
-        using TaskQueue = std::queue<Task*>;
+        using TaskQueue = std::list<Task*>;
 
         class Loop {
                 public:
+                        Loop();
+                        ~Loop();
                         void queue(Task* t);
                         std::optional<Task*> next();
                 private:

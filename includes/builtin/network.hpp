@@ -10,21 +10,12 @@ namespace builtin {
       0
     };
 
-    void getServerHandlerFunction(JSContext *ctx, JS::MutableHandleValue rval);
+    JSNATIVE(getHandler);
+
+    JSNATIVE(setHandler);
     
-    void getClientHandlerFunction(JSContext *ctx, JS::MutableHandleValue rval);
-
-    JSNATIVE(getNetServerHandler);
-
-    JSNATIVE(setNetServerHandler);
-    
-    JSNATIVE(getNetClientHandler);
-
-    JSNATIVE(setNetClientHandler);
-  
     static JSPropertySpec serverProperties[] = {
-      JS_PSGS("server", getNetServerHandler, setNetServerHandler, 0),
-      JS_PSGS("client", getNetClientHandler, setNetClientHandler, 0),
+      JS_PSGS("handler", getHandler, setHandler, 0),
       JS_PS_END,
     };
 
@@ -41,9 +32,15 @@ namespace builtin {
      * they work the same?
      */
     JSNATIVE(postMessage);
+    JSNATIVE(start);
+    JSNATIVE(stop);
+    JSNATIVE(connect);
 
     static JSFunctionSpec serverMethods[] = {
       JS_FN("postMessage", postMessage, 1, 0),
+      JS_FN("start", start, 1, 0),
+      JS_FN("stop", stop, 1, 0),
+      JS_FN("connect", connect, 1, 0),
       JS_FS_END,
     };
 

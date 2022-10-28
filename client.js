@@ -54,7 +54,7 @@ function encodeString(str) {
   return buf;
 }
 
-network.server = (host, event) => {
+network.handler = (host, event) => {
   switch (event.type) {
   case "connect":
     logPeer(event.peer);
@@ -76,24 +76,11 @@ network.server = (host, event) => {
   }
 }
 
-network.client = (host, event) => {
-  switch (event.type) {
-  case "connect":
-    logPeer(event.peer);
-    break;
-  case "disconnect":
-    logPeer(event.peer);
-    break;
-  case "receive":
-    console.log("received data from server");
-    if (event.packet !== undefined) {
-      console.log(`received ${event.packet.byteLength} bytes from server`)
-      console.log(decodeString(event.packet));
-    }
-    break;
-  case "none":
-    console.log("received none :(")
-  }
-}
-
 //currentState = ServerState.Pregame;
+//function tick () {
+//        console.log("tick");
+//        setTimeout(tick, 1000);
+//}
+//setTimeout(tick);
+
+network.connect()

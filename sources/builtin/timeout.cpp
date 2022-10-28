@@ -21,7 +21,7 @@ namespace builtin {
                                 target(std::chrono::steady_clock::now())
                         {}
 
-                        TimeoutTask(JSContext *ctx, JSObject *functionRef, int delay) :
+                        TimeoutTask(JSContext *ctx, JSObject *functionRef, int32_t delay) :
                                 ctx(ctx),
                                 functionRef(functionRef),
                                 target(std::chrono::steady_clock::now()
@@ -51,18 +51,26 @@ namespace builtin {
                 };
 
                 JSNATIVE(setTimeout) {
+                        // setTimeout(functionRef)
                         // setTimeout(functionRef, delay)
-                        // setTimeout(functionRef, delay, param1);
-                        // setTimeout(functionRef, delay, param1, param2);
-                        // setTimeout(functionRef, delay, param1, param2, ...);
+                        // TODO(edoput) setTimeout(functionRef, delay, param1);
+                        // TODO(edoput) setTimeout(functionRef, delay, param1, param2);
+                        // TODO(edoput) setTimeout(functionRef, delay, param1, param2, ...);
                         
                         JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
 
                         // TODO(edoput) get timeout duration
-                        auto timeout = new TimeoutTask(ctx, &args.get(0).toObject(), 0);
+
+                        event_loop::Task* timeout;
+                        if (args.length() == 1) {
+                                timeout = new TimeoutTask(ctx, &args.get(0).toObject());
+                        } else {
+                                timeout = new TimeoutTask(ctx, &args.get(0).toObject(), args.get(1).toInt32());
+                        }
                         auto loop = static_cast<event_loop::Loop*>(JS_GetContextPrivate(ctx));
                         loop->queue(timeout);
                         // TODO(edoput) return id of timeout
+                        args.rval().setUndefined();
                         return true;
                 };
 

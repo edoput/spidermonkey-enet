@@ -1,23 +1,20 @@
+#include <cstdio>
 #include <cassert>
 #include <string>
-//#include <fstream>
-//#include <iostream>
-//
+#include <filesystem>
+
 #include <jsapi.h>
-//#include <enet/enet.h>
-//
 #include <js/CompilationAndEvaluation.h>
 #include <js/CompileOptions.h>
-//#include <js/Conversions.h>
 #include <js/Initialization.h>
-//#include <js/SourceText.h>
 #include <js/Warnings.h>
+#include <enet/enet.h>
 
-#include "base.cpp"
 #include "builtin/console.hpp"
 #include "builtin/network.hpp"
 #include "builtin/timeout.hpp"
 
+#include "host/agent.hpp"
 #include "event_loop/loop.hpp"
 
 using string = std::string;
@@ -82,9 +79,14 @@ class ScriptTask : public event_loop::Task {
 
 int main(int argc, const char* argv[]) {
   
-  string role{argv[0]};
-  
-  Setup();
+  //try {
+  //      host::agent::init();
+  //} catch (std::exception e) {
+  //      printf(e.what());
+  //}
+  JS_Init();
+  enet_initialize();
+  atexit(enet_deinitialize);
 
   JSContext *rootCtx = JS_NewContext(JS::DefaultHeapMaxBytes);
   //JSContext *enetCtx = JS_NewContext(JS::DefaultHeapMaxBytes);
@@ -95,12 +97,12 @@ int main(int argc, const char* argv[]) {
   JS::InitSelfHostedCode(rootCtx);
   //JS::InitSelfHostedCode(enetCtx);
 
-  if (role == "server") {
-    log_destination = fopen("spidermonkey-client.log", "w+");
-  } else {
-    log_destination = fopen("spidermonkey-server.log", "w+");
-  }
-  assert(!JS::SetWarningReporter(rootCtx, reporter));
+  //if (role == "server") {
+  //  log_destination = fopen("spidermonkey-client.log", "w+");
+  //} else {
+  //  log_destination = fopen("spidermonkey-server.log", "w+");
+  //}
+  //assert(!JS::SetWarningReporter(rootCtx, reporter));
 
   // https://groups.google.com/g/mozilla.dev.tech.js-engine/c/wr55L3lCMZg/m/wExXgUqvAgAJ
   // Yes you can create multiple global objects with JS_NewGlobalObject, switch
@@ -123,7 +125,9 @@ int main(int argc, const char* argv[]) {
   // attach to this context the event loop
   JS_SetContextPrivate(rootCtx, static_cast<void*>(&loop));
 
-  auto networkScript = new ScriptTask(rootCtx, "network.js");
+  string scriptName{argv[1]};
+  auto networkScript = new ScriptTask(rootCtx, scriptName);
+
   loop.queue(networkScript);
   while (true) {
           // NOTE(edoput) I don't like this implementation right now
@@ -137,17 +141,6 @@ int main(int argc, const char* argv[]) {
           // TODO(edoput) MICRO task
   }
 
-  //if (role == "./client") {
-  //  ENetHost *client = MakeClient();
-  //  Client(client, rootCtx, global, network, console);
-  //} else {
-  //  ENetHost  *server = MakeHost();
-  //  // set up an internal job queue for Promises
-  //  // before the self-hosting
-  //  Server(server, rootCtx, global, network, console);
-  //}
-
   JS_DestroyContext(rootCtx);
 
-  Teardown();
 }

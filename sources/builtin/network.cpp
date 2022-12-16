@@ -78,7 +78,7 @@ namespace builtin {
                             JS_DefineFunctions(ctx,  eventObject, enet::eventMethods);
 
                             JS_SetPrivate(clientHost, host);
-                            JS_SetPrivate(eventObject, &event);
+                            JS_SetPrivate(eventObject, event);
 
                             // finally call the function associated
                             JS::RootedValueArray<2> args(ctx);
@@ -110,6 +110,7 @@ namespace builtin {
                             loop->queue(t);
                     }
             }
+            enet_host_destroy(host);
     }
 
     JSNATIVE(start) {
@@ -140,6 +141,8 @@ namespace builtin {
       address.port = 20595;
       auto host = enet_host_create(NULL, 1, 2, 0, 0);
       enet_host_connect(host, &address, 2, 0);
+      std::thread m(startEnet, ctx, host);
+      m.detach();
       args.rval().setUndefined();
       return true;
     }

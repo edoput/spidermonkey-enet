@@ -7,7 +7,7 @@ make main
 
 ## Run
 
-To run the sample application make two symlinks, server and clide, point to main executable.
+The `server.js` and `client.js` files implement the basic client-server exchange.
 
 ## Debugging
 
@@ -17,12 +17,12 @@ and the run server/client.
 
 ```bash
 $ gdb main
-(gdb) run server
+(gdb) run server.js
 ```
 
 ```bash
 $ gdb main
-(gdb) run client
+(gdb) run client.js
 ```
 
 ## Shared memory

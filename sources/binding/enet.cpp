@@ -130,8 +130,8 @@ namespace enet {
   JSNATIVE(getEventChannel) {
     JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
     ENetEvent *self = getEventPrivate(ctx, args.thisv());
-    //TODO(edoput) args.rval().setNumber(self->channelID);
-    args.rval().setUndefined();
+    JS::RootedValue channelValue(ctx, JS::NumberValue(self->channelID));
+    args.rval().set(channelValue);
     return true;
   }
 

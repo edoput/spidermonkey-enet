@@ -104,11 +104,15 @@ namespace builtin {
             while (!shutdown) {
                     //TODO(edoput) configurable timeout
                     int timeout = 1000;
-                    auto event = static_cast<ENetEvent*>(malloc(sizeof(ENetEvent)));
+                    auto event = new ENetEvent;
                     while (enet_host_service(host, event, timeout) > 0) {
                             auto t = new ENetTask(host, event, ctx, handler);
                             loop->queue(t);
+			    // there may be more events queued so do use a new event structure
+			    event = new ENetEvent;
                     }
+		    // no more events so this can be safely deallocted
+		    delete(event);
             }
             enet_host_destroy(host);
     }
